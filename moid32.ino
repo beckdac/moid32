@@ -149,7 +149,6 @@ int i2c_scan(void) {
 			if (addr < 16)
 				Serial1.print("0");
 			Serial1.println(addr, HEX);
-			Serial1.println(addr, DEC);
 #endif
 			++n_devices;
 		} else if (error == 4) {
