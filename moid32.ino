@@ -25,6 +25,13 @@
  *****************************************************************************/
 
 /******************************************************************************
+ * i2c
+ *****************************************************************************/
+#include <HardWire.h>
+HardWire HWire(1, I2C_FAST_MODE | I2C_REMAP);
+
+
+/******************************************************************************
  * Rotary encoders
  *****************************************************************************/
 #define ENCODERS 1
@@ -42,6 +49,7 @@ int encoder_max[ENCODERS] = { 20 };
 unsigned int encoder_last_value[ENCODERS];
 HardwareTimer encoder_timer(1);
 
+
 /******************************************************************************
  * LED pins
  *****************************************************************************/
@@ -58,11 +66,19 @@ HardwareTimer encoder_timer(1);
 #undef SERIAL
 #define SERIAL
 
+
+/******************************************************************************
+ * setup
+ *****************************************************************************/
 void setup() {
+	HWire.begin();
+
 #ifdef SERIAL
 	Serial1.begin(SERIAL_BAUD);
 	Serial1.println("Welcome, give us a spin...");
 #endif
+
+	i2c_scan();
  
 #ifdef PMW_OUT
 	pinMode(PWM_PIN, PWM);
@@ -91,22 +107,70 @@ void loop() {
 		} else
 			++loopc;
 #endif
-	if ((encoder_last_value[i] != encoder_value[i])) {
+		
+		if ((encoder_last_value[i] != encoder_value[i])) {
 #ifdef SERIAL
-		Serial1.print("Encoder ");
-		Serial1.print(i, DEC);
-		Serial1.print(" = ");
-		Serial1.print(encoder_value[i]);
-		Serial1.print(", loopc = ");
-		Serial1.println(loopc);
+			Serial1.print("Encoder ");
+			Serial1.print(i, DEC);
+			Serial1.print(" = ");
+			Serial1.print(encoder_value[i]);
+			Serial1.print(", loopc = ");
+			Serial1.println(loopc);
 #endif
-		encoder_last_value[i] = encoder_value[i];
+			encoder_last_value[i] = encoder_value[i];
 #ifdef PWM_OUT
-		pwmWrite(PWM_PIN, map(encoder_value[i], 0, encoder_max[i], 0, 65536));
+			pwmWrite(PWM_PIN, map(encoder_value[i], 0, encoder_max[i], 0, 65535));
 #endif
-    }
-  }
+    	}
+  	}
 
+}
+
+
+/******************************************************************************
+ * Encoder interupt and data structure initialization
+ *****************************************************************************/
+int i2c_scan(void) {
+	uint8_t error, addr;
+	int n_devices = 0;
+
+#ifdef SERIAL
+	Serial1.println("starting i2c bus scan...");
+#endif
+
+	for (addr = 1; addr < 127; ++addr) {
+		HWire.beginTransmission(addr);
+		error = HWire.endTransmission();
+
+		if (error == 0) {
+#ifdef SERIAL
+			Serial1.println("hai!");
+			Serial1.print("i2c device found @ 0x");
+			if (addr < 16)
+				Serial1.print("0");
+			Serial1.println(addr, HEX);
+			Serial1.println(addr, DEC);
+#endif
+			++n_devices;
+		} else if (error == 4) {
+#ifdef SERIAL
+			Serial1.print("unknown error @ 0x");
+			if (addr < 16)
+				Serial1.print("0");
+			Serial1.println(addr, HEX);
+#endif
+		}
+	}
+#ifdef SERIAL
+	if (n_devices == 0)
+		Serial1.println("no i2c devices found");
+	else {
+		Serial1.print("found ");
+		Serial1.print(n_devices, DEC);
+		Serial1.println(" i2c devices");
+	}
+#endif
+	return n_devices;
 }
 
 
