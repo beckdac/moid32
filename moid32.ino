@@ -32,6 +32,16 @@ HardWire HWire(1, I2C_FAST_MODE | I2C_REMAP);
 
 
 /******************************************************************************
+ * SSD1306 OLED
+ *****************************************************************************/
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306_STM32.h>
+// this pin is not used but needs to be provided to the driver, use the LED pin
+#define OLED_RESET	PC13
+Adafruit_SSD1306 oled(OLED_RESET);
+
+
+/******************************************************************************
  * Rotary encoders
  *****************************************************************************/
 #define ENCODERS 1
@@ -60,7 +70,7 @@ HardwareTimer encoder_timer(1);
 
 
 /******************************************************************************
- * LED pins
+ * Serial
  *****************************************************************************/
 #define SERIAL_BAUD	9600
 #undef SERIAL
@@ -71,14 +81,23 @@ HardwareTimer encoder_timer(1);
  * setup
  *****************************************************************************/
 void setup() {
+	// start i2c bus
 	HWire.begin();
 
 #ifdef SERIAL
+	// setup serial and send welcome message
 	Serial1.begin(SERIAL_BAUD);
 	Serial1.println("Welcome, give us a spin...");
 #endif
 
-	i2c_scan();
+	// scan the i2c bus for devices
+	if (i2c_scan() == 0) {
+#ifdef SERIAL
+		Serial1.println("WARNING: no OLED found!");
+#endif
+	}
+	oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+	oled.display();
  
 #ifdef PMW_OUT
 	pinMode(PWM_PIN, PWM);
@@ -89,6 +108,13 @@ void setup() {
 #endif
 
 	encoders_init();
+
+	oled.clearDisplay();
+	oled.setTextSize(1);
+	oled.setTextColor(WHITE);
+	oled.setCursor(0, 0);
+	oled.println("Welcome!");
+	oled.display();
 }
 
 /******************************************************************************
@@ -99,6 +125,8 @@ uint16_t loopc = 0;
 #endif
 
 void loop() {
+	boolean oled_update = false;
+
 	for (uint8_t i = 0; i < ENCODERS; ++i) {
 #ifndef PWM_OUT
 		if (loopc >= (65535 / encoder_max[i]) * encoder_value[i]) {
@@ -121,9 +149,21 @@ void loop() {
 #ifdef PWM_OUT
 			pwmWrite(PWM_PIN, map(encoder_value[i], 0, encoder_max[i], 0, 65535));
 #endif
+			oled_update = true;
     	}
   	}
-
+	if (oled_update) {
+		oled.clearDisplay();
+		oled.setCursor(0, 0);
+		oled.println("Encoder:");
+		for (uint8_t i = 0; i < ENCODERS; ++i) {
+			oled.print("#");
+			oled.print(i + 1, DEC);
+			oled.print(" = ");
+			oled.println(encoder_value[i], DEC);
+		}
+		oled.display();
+	}
 }
 
 
