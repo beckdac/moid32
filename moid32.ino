@@ -82,8 +82,8 @@ HardwareTimer pwm_timer(2);
  * Serial
  *****************************************************************************/
 #define SERIAL_BAUD	9600
-#undef SERIAL
 #define SERIAL
+#undef SERIAL
 
 
 /******************************************************************************
@@ -198,7 +198,6 @@ int i2c_scan(void) {
 
 		if (error == 0) {
 #ifdef SERIAL
-			Serial1.println("hai!");
 			Serial1.print("i2c device found @ 0x");
 			if (addr < 16)
 				Serial1.print("0");
