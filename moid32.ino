@@ -52,12 +52,10 @@ boolean encoder_clk[ENCODERS];
 boolean encoder_dt[ENCODERS];
 volatile int16_t encoder_value[ENCODERS];
 volatile int  encoder_millis[ENCODERS]; 
-// for the second encoder, be sure to remove the -DSERIAL_USB from the 
-// appropriate entry in hardware/Arduino_STM32/STM32F1/boards.txt
 int encoder_clk_pin[ENCODERS] = { PB4, PB6 };
 int encoder_dt_pin[ENCODERS] = { PB5, PB7 };
-int encoder_min[ENCODERS] = { 0 };
-int encoder_max[ENCODERS] = { 20 };
+int encoder_min[ENCODERS] = { 0, 0 };
+int encoder_max[ENCODERS] = { 20, 20 };
 unsigned int encoder_last_value[ENCODERS];
 HardwareTimer encoder_timer(1);
 
