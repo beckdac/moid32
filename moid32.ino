@@ -44,7 +44,7 @@ Adafruit_SSD1306 oled(OLED_RESET);
 /******************************************************************************
  * Rotary encoders
  *****************************************************************************/
-#define ENCODERS 1
+#define ENCODERS 2
 #define ENCODER_PERIOD_uS	1000
 #define ENCODER_SLOW_MS	3
 #define ENCODER_FAST_STEPS	5
@@ -52,8 +52,8 @@ boolean encoder_clk[ENCODERS];
 boolean encoder_dt[ENCODERS];
 volatile int16_t encoder_value[ENCODERS];
 volatile int  encoder_millis[ENCODERS]; 
-int encoder_clk_pin[ENCODERS] = { PB4 };
-int encoder_dt_pin[ENCODERS] = { PB5 };
+int encoder_clk_pin[ENCODERS] = { PB4, PB6 };
+int encoder_dt_pin[ENCODERS] = { PB5, PB7 };
 int encoder_min[ENCODERS] = { 0 };
 int encoder_max[ENCODERS] = { 20 };
 unsigned int encoder_last_value[ENCODERS];
@@ -78,7 +78,14 @@ HardwareTimer encoder_timer(1);
 
 
 /******************************************************************************
- * setup
+ * Misc 
+ *****************************************************************************/
+#undef DEBUG
+#define DEBUG
+
+
+/******************************************************************************
+ * Setup
  *****************************************************************************/
 void setup() {
 	// start i2c bus
@@ -115,6 +122,13 @@ void setup() {
 	oled.setCursor(0, 0);
 	oled.println("Welcome!");
 	oled.display();
+
+#ifdef DEBUG
+	pinMode(PB6, OUTPUT);
+	digitalWrite(PB6, LOW);
+	pinMode(PB7, OUTPUT);
+	digitalWrite(PB7, HIGH);
+#endif
 }
 
 /******************************************************************************
@@ -132,6 +146,10 @@ void loop() {
 		if (loopc >= (65535 / encoder_max[i]) * encoder_value[i]) {
 			digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 			loopc = 0;
+#ifdef DEBUG
+			digitalWrite(PB6, !digitalRead(PB6));
+			digitalWrite(PB7, !digitalRead(PB7));
+#endif
 		} else
 			++loopc;
 #endif
@@ -147,20 +165,21 @@ void loop() {
 #endif
 			encoder_last_value[i] = encoder_value[i];
 #ifdef PWM_OUT
-			pwmWrite(PWM_PIN, map(encoder_value[i], 0, encoder_max[i], 0, 65535));
+			pwmWrite(PWM_PIN, map(encoder_value[i], encoder_min[i], encoder_max[i], 0, 65535));
 #endif
 			oled_update = true;
     	}
   	}
 	if (oled_update) {
 		oled.clearDisplay();
-		oled.setCursor(0, 0);
-		oled.println("Encoder:");
 		for (uint8_t i = 0; i < ENCODERS; ++i) {
-			oled.print("#");
+			#define ENCODER_GRAPH_SEP 16
+			oled.setCursor(i * ENCODER_GRAPH_SEP, 0);
 			oled.print(i + 1, DEC);
-			oled.print(" = ");
+			oled.setCursor(i * ENCODER_GRAPH_SEP, 9);
 			oled.println(encoder_value[i], DEC);
+			#define ENCODER_GRAPH_MAX 48
+			gfx_bar_graph(i * ENCODER_GRAPH_SEP, 64, 10, ENCODER_GRAPH_MAX, map(encoder_value[i], encoder_min[i], encoder_max[i], 0, ENCODER_GRAPH_MAX));
 		}
 		oled.display();
 	}
@@ -268,4 +287,19 @@ void encoders_init() {
 	encoder_timer.attachCompare1Interrupt(encoders_read);
 	encoder_timer.refresh();
 	encoder_timer.resume();
+}
+
+
+/******************************************************************************
+ * Graphics visuals
+ *****************************************************************************/
+void gfx_bar_graph(uint8_t base_x, uint8_t base_y, uint8_t width, 
+					uint8_t height, uint8_t value) {
+	uint8_t x0, y0, fill_height;
+	if (value > height)
+		value = height;
+	x0 = base_x;
+	y0 = base_y - height;
+	fill_height = value;
+	oled.fillRect(x0, y0, width, fill_height, 1);
 }
