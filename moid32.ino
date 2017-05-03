@@ -52,6 +52,8 @@ boolean encoder_clk[ENCODERS];
 boolean encoder_dt[ENCODERS];
 volatile int16_t encoder_value[ENCODERS];
 volatile int  encoder_millis[ENCODERS]; 
+// for the second encoder, be sure to remove the -DSERIAL_USB from the 
+// appropriate entry in hardware/Arduino_STM32/STM32F1/boards.txt
 int encoder_clk_pin[ENCODERS] = { PB4, PB6 };
 int encoder_dt_pin[ENCODERS] = { PB5, PB7 };
 int encoder_min[ENCODERS] = { 0 };
@@ -65,7 +67,7 @@ HardwareTimer encoder_timer(1);
  *****************************************************************************/
 #define LED_PIN PC13
 // should the LED pin be pulsed with PWM (won't work on PC13)
-#define PWM_OUT 1
+#define PWM_OUT
 #undef PWM_OUT
 
 
@@ -80,8 +82,8 @@ HardwareTimer encoder_timer(1);
 /******************************************************************************
  * Misc 
  *****************************************************************************/
-#undef DEBUG
 #define DEBUG
+#undef DEBUG
 
 
 /******************************************************************************
@@ -143,14 +145,14 @@ void loop() {
 
 	for (uint8_t i = 0; i < ENCODERS; ++i) {
 #ifndef PWM_OUT
-		if (loopc >= (65535 / encoder_max[i]) * encoder_value[i]) {
+		if (i == 0 && loopc >= (65535 / encoder_max[i]) * encoder_value[i]) {
 			digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 			loopc = 0;
 #ifdef DEBUG
 			digitalWrite(PB6, !digitalRead(PB6));
 			digitalWrite(PB7, !digitalRead(PB7));
 #endif
-		} else
+		} else if (i == 0)
 			++loopc;
 #endif
 		
@@ -239,6 +241,7 @@ void encoders_read() {
 	for (uint8_t i = 0; i < ENCODERS; ++i) {
 		// gpio_read_bit is faster than digitalRead http://forums.leaflabs.com/topic.php?id=1107 
 		if ((gpio_read_bit(PIN_MAP[encoder_clk_pin[i]].gpio_device, PIN_MAP[encoder_clk_pin[i]].gpio_bit) ? HIGH : LOW) != encoder_clk[i]) {
+		//if ((digitalRead(encoder_clk_pin[i]) ? HIGH : LOW) != encoder_clk[i]) {
 			encoder_clk[i] = !encoder_clk[i];
 			if (encoder_clk[i] && !encoder_dt[i]) {
 				if (millis() - encoder_millis[i] > ENCODER_SLOW_MS)
@@ -253,6 +256,7 @@ void encoders_read() {
 			encoder_millis[i] = millis();
 		}
 		if ((gpio_read_bit(PIN_MAP[encoder_dt_pin[i]].gpio_device, PIN_MAP[encoder_dt_pin[i]].gpio_bit) ? HIGH : LOW) != encoder_dt[i]) {
+		//if ((digitalRead(encoder_dt_pin[i]) ? HIGH : LOW) != encoder_dt[i]) {
 			encoder_dt[i] = !encoder_dt[i];
 			if (encoder_dt[i] && !encoder_clk[i]) {
 				if (millis() - encoder_millis[i] > ENCODER_SLOW_MS)
