@@ -61,12 +61,21 @@ HardwareTimer encoder_timer(1);
 
 
 /******************************************************************************
+ * PWM
+ *****************************************************************************/
+#define PWMS	2
+#define PWM_PERIOD_uS_DEFAULT	50
+uint16_t pwm_period_uS[PWMS] = { PWM_PERIOD_uS_DEFAULT, PWM_PERIOD_uS_DEFAULT };
+uint16_t pwm_max_duty_cycle[PWMS] = { 0, 0 };
+uint16_t pwm_duty_cycle[PWMS] = { 0, 0 };
+uint16_t pwm_pins[PWMS] = { PA0, PA1 };
+HardwareTimer pwm_timer(2);
+
+
+/******************************************************************************
  * LED pins
  *****************************************************************************/
 #define LED_PIN PC13
-// should the LED pin be pulsed with PWM (won't work on PC13)
-#define PWM_OUT
-#undef PWM_OUT
 
 
 /******************************************************************************
@@ -107,8 +116,6 @@ void setup() {
 	oled.display();
  
 #ifdef PMW_OUT
-	pinMode(PWM_PIN, PWM);
-	pwmWrite(PWM_PIN, 0);
 #else
 	pinMode(LED_PIN, OUTPUT);
 	digitalWrite(LED_PIN, LOW);
@@ -123,37 +130,27 @@ void setup() {
 	oled.println("Welcome!");
 	oled.display();
 
-#ifdef DEBUG
-	pinMode(PB6, OUTPUT);
-	digitalWrite(PB6, LOW);
-	pinMode(PB7, OUTPUT);
-	digitalWrite(PB7, HIGH);
-#endif
+	pwm_init();
 }
 
 /******************************************************************************
  * Main loop
  *****************************************************************************/
-#ifndef PWM_OUT
+#define LOOP_BLINK 32768
 uint16_t loopc = 0;
-#endif
 
 void loop() {
 	boolean oled_update = false;
 
+	// blink status LED
+	if (loopc >= LOOP_BLINK) {
+		digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+		loopc = 0;
+	}
+	++loopc;
+
+	// query encoders and update / display info
 	for (uint8_t i = 0; i < ENCODERS; ++i) {
-#ifndef PWM_OUT
-		if (i == 0 && loopc >= (65535 / encoder_max[i]) * encoder_value[i]) {
-			digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-			loopc = 0;
-#ifdef DEBUG
-			digitalWrite(PB6, !digitalRead(PB6));
-			digitalWrite(PB7, !digitalRead(PB7));
-#endif
-		} else if (i == 0)
-			++loopc;
-#endif
-		
 		if ((encoder_last_value[i] != encoder_value[i])) {
 #ifdef SERIAL
 			Serial1.print("Encoder ");
@@ -164,9 +161,7 @@ void loop() {
 			Serial1.println(loopc);
 #endif
 			encoder_last_value[i] = encoder_value[i];
-#ifdef PWM_OUT
-			pwmWrite(PWM_PIN, map(encoder_value[i], encoder_min[i], encoder_max[i], 0, 65535));
-#endif
+			pwmWrite(pwm_pins[i], map(encoder_value[i], encoder_min[i], encoder_max[i], 0, pwm_max_duty_cycle[i]));
 			oled_update = true;
     	}
   	}
@@ -304,4 +299,20 @@ void gfx_bar_graph(uint8_t base_x, uint8_t base_y, uint8_t width,
 	y0 = base_y - height;
 	fill_height = value;
 	oled.fillRect(x0, y0, width, fill_height, 1);
+}
+
+
+/******************************************************************************
+ * PWM
+ *****************************************************************************/
+void pwm_init() {
+	for (uint8_t i = 0; i < PWMS; ++i) {
+		pwm_timer.pause();
+		pwm_max_duty_cycle[i] = pwm_timer.setPeriod(pwm_period_uS[i]);
+		pwm_timer.refresh();
+		pwm_timer.resume();
+
+		pinMode(pwm_pins[i], PWM);
+		pwmWrite(pwm_pins[i], 0);
+	}
 }
