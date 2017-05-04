@@ -50,6 +50,7 @@ Adafruit_SSD1306 oled(OLED_RESET);
 #define ENCODER_FAST_STEPS    5
 boolean encoder_clk[ENCODERS];
 boolean encoder_dt[ENCODERS];
+boolean encoder_sw[ENCODERS];
 volatile int16_t encoder_value[ENCODERS];
 volatile int  encoder_millis[ENCODERS]; 
 int encoder_clk_pin[ENCODERS] = { PB4, PB6 };
@@ -58,6 +59,7 @@ int encoder_sw_pin[ENCODERS] = { PA15 , PB3 };
 int encoder_min[ENCODERS] = { 0, 0 };
 int encoder_max[ENCODERS] = { 20, 20 };
 unsigned int encoder_last_value[ENCODERS];
+boolean encoder_last_sw[ENCODERS];
 HardwareTimer encoder_timer(1);
 
 
@@ -83,7 +85,7 @@ HardwareTimer pwm_timer(2);
  * Serial
  *****************************************************************************/
 #define SERIAL_BAUD    9600
-#define SERIAL
+#define SERIAL  Serial1
 #undef SERIAL
 
 
@@ -103,14 +105,14 @@ void setup() {
 
 #ifdef SERIAL
     // setup serial and send welcome message
-    Serial1.begin(SERIAL_BAUD);
-    Serial1.println("Welcome, give us a spin...");
+    SERIAL.begin(SERIAL_BAUD);
+    SERIAL.println("Welcome, give us a spin...");
 #endif
 
     // scan the i2c bus for devices
     if (i2c_scan() == 0) {
 #ifdef SERIAL
-        Serial1.println("WARNING: no OLED found!");
+        SERIAL.println("WARNING: no OLED found!");
 #endif
     }
     oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -124,12 +126,7 @@ void setup() {
 
     encoders_init();
 
-    oled.clearDisplay();
-    oled.setTextSize(1);
-    oled.setTextColor(WHITE);
-    oled.setCursor(0, 0);
-    oled.println("Welcome!");
-    oled.display();
+    oled_init();
 
     pwm_init();
 }
@@ -154,18 +151,34 @@ void loop() {
     for (uint8_t i = 0; i < ENCODERS; ++i) {
         if (encoder_last_value[i] != encoder_value[i]) {
 #ifdef SERIAL
-            Serial1.print("Encoder ");
-            Serial1.print(i, DEC);
-            Serial1.print(" = ");
-            Serial1.print(encoder_value[i]);
-            Serial1.print(", loopc = ");
-            Serial1.println(loopc);
+            SERIAL.print("Encoder ");
+            SERIAL.print(i, DEC);
+            SERIAL.print(" = ");
+            SERIAL.print(encoder_value[i]);
+            SERIAL.print(", loopc = ");
+            SERIAL.println(loopc);
 #endif
             encoder_last_value[i] = encoder_value[i];
             pwmWrite(pwm_pins[i], map(encoder_value[i], \
                                         encoder_min[i], encoder_max[i], \
                                         0, pwm_max_duty_cycle[i]));
             oled_update = true;
+        }
+        if (encoder_sw[i] == TRUE) {
+            switch(i) {
+                case 0:
+                    // control encoder handling
+                    break;
+                case 1:
+                    // channel 1 handling
+                    break;
+                case 2:
+                    // channel 2 handling
+                    break;
+                default:
+                    break;
+            };
+            encoder_sw[i] = FALSE;
         }
     }
     if (oled_update) {
@@ -196,7 +209,7 @@ int i2c_scan(void) {
     int n_devices = 0;
 
 #ifdef SERIAL
-    Serial1.println("starting i2c bus scan...");
+    SERIAL.println("starting i2c bus scan...");
 #endif
 
     for (addr = 1; addr < 127; ++addr) {
@@ -205,28 +218,28 @@ int i2c_scan(void) {
 
         if (error == 0) {
 #ifdef SERIAL
-            Serial1.print("i2c device found @ 0x");
+            SERIAL.print("i2c device found @ 0x");
             if (addr < 16)
-                Serial1.print("0");
-            Serial1.println(addr, HEX);
+                SERIAL.print("0");
+            SERIAL.println(addr, HEX);
 #endif
             ++n_devices;
         } else if (error == 4) {
 #ifdef SERIAL
-            Serial1.print("unknown error @ 0x");
+            SERIAL.print("unknown error @ 0x");
             if (addr < 16)
-                Serial1.print("0");
-            Serial1.println(addr, HEX);
+                SERIAL.print("0");
+            SERIAL.println(addr, HEX);
 #endif
         }
     }
 #ifdef SERIAL
     if (n_devices == 0)
-        Serial1.println("no i2c devices found");
+        SERIAL.println("no i2c devices found");
     else {
-        Serial1.print("found ");
-        Serial1.print(n_devices, DEC);
-        Serial1.println(" i2c devices");
+        SERIAL.print("found ");
+        SERIAL.print(n_devices, DEC);
+        SERIAL.println(" i2c devices");
     }
 #endif
     return n_devices;
@@ -321,4 +334,17 @@ void pwm_init() {
         pinMode(pwm_pins[i], PWM);
         pwmWrite(pwm_pins[i], 0);
     }
+}
+
+
+/******************************************************************************
+ * OLED
+ *****************************************************************************/
+void oled_init(void) {
+    oled.clearDisplay();
+    oled.setTextSize(1);
+    oled.setTextColor(WHITE);
+    oled.setCursor(0, 0);
+    oled.println("Welcome!");
+    oled.display();
 }
