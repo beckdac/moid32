@@ -37,7 +37,7 @@ HardWire HWire(1, I2C_FAST_MODE | I2C_REMAP);
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306_STM32.h>
 // this pin is not used but needs to be provided to the driver, use the LED pin
-#define OLED_RESET	PC13
+#define OLED_RESET    PC13
 Adafruit_SSD1306 oled(OLED_RESET);
 
 
@@ -45,15 +45,16 @@ Adafruit_SSD1306 oled(OLED_RESET);
  * Rotary encoders
  *****************************************************************************/
 #define ENCODERS 2
-#define ENCODER_PERIOD_uS	1000
-#define ENCODER_SLOW_MS	3
-#define ENCODER_FAST_STEPS	5
+#define ENCODER_PERIOD_uS    1000
+#define ENCODER_SLOW_MS    3
+#define ENCODER_FAST_STEPS    5
 boolean encoder_clk[ENCODERS];
 boolean encoder_dt[ENCODERS];
 volatile int16_t encoder_value[ENCODERS];
 volatile int  encoder_millis[ENCODERS]; 
 int encoder_clk_pin[ENCODERS] = { PB4, PB6 };
 int encoder_dt_pin[ENCODERS] = { PB5, PB7 };
+int encoder_sw_pin[ENCODERS] = { PA15 , PB3 };
 int encoder_min[ENCODERS] = { 0, 0 };
 int encoder_max[ENCODERS] = { 20, 20 };
 unsigned int encoder_last_value[ENCODERS];
@@ -63,8 +64,8 @@ HardwareTimer encoder_timer(1);
 /******************************************************************************
  * PWM
  *****************************************************************************/
-#define PWMS	2
-#define PWM_PERIOD_uS_DEFAULT	50
+#define PWMS    2
+#define PWM_PERIOD_uS_DEFAULT    50
 uint16_t pwm_period_uS[PWMS] = { PWM_PERIOD_uS_DEFAULT, PWM_PERIOD_uS_DEFAULT };
 uint16_t pwm_max_duty_cycle[PWMS] = { 0, 0 };
 uint16_t pwm_duty_cycle[PWMS] = { 0, 0 };
@@ -81,7 +82,7 @@ HardwareTimer pwm_timer(2);
 /******************************************************************************
  * Serial
  *****************************************************************************/
-#define SERIAL_BAUD	9600
+#define SERIAL_BAUD    9600
 #define SERIAL
 #undef SERIAL
 
@@ -97,40 +98,40 @@ HardwareTimer pwm_timer(2);
  * Setup
  *****************************************************************************/
 void setup() {
-	// start i2c bus
-	HWire.begin();
+    // start i2c bus
+    HWire.begin();
 
 #ifdef SERIAL
-	// setup serial and send welcome message
-	Serial1.begin(SERIAL_BAUD);
-	Serial1.println("Welcome, give us a spin...");
+    // setup serial and send welcome message
+    Serial1.begin(SERIAL_BAUD);
+    Serial1.println("Welcome, give us a spin...");
 #endif
 
-	// scan the i2c bus for devices
-	if (i2c_scan() == 0) {
+    // scan the i2c bus for devices
+    if (i2c_scan() == 0) {
 #ifdef SERIAL
-		Serial1.println("WARNING: no OLED found!");
+        Serial1.println("WARNING: no OLED found!");
 #endif
-	}
-	oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-	oled.display();
+    }
+    oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    oled.display();
  
 #ifdef PMW_OUT
 #else
-	pinMode(LED_PIN, OUTPUT);
-	digitalWrite(LED_PIN, LOW);
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
 #endif
 
-	encoders_init();
+    encoders_init();
 
-	oled.clearDisplay();
-	oled.setTextSize(1);
-	oled.setTextColor(WHITE);
-	oled.setCursor(0, 0);
-	oled.println("Welcome!");
-	oled.display();
+    oled.clearDisplay();
+    oled.setTextSize(1);
+    oled.setTextColor(WHITE);
+    oled.setCursor(0, 0);
+    oled.println("Welcome!");
+    oled.display();
 
-	pwm_init();
+    pwm_init();
 }
 
 /******************************************************************************
@@ -140,44 +141,50 @@ void setup() {
 uint16_t loopc = 0;
 
 void loop() {
-	boolean oled_update = false;
+    boolean oled_update = false;
 
-	// blink status LED
-	if (loopc >= LOOP_BLINK) {
-		digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-		loopc = 0;
-	}
-	++loopc;
+    // blink status LED
+    if (loopc >= LOOP_BLINK) {
+        digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+        loopc = 0;
+    }
+    ++loopc;
 
-	// query encoders and update / display info
-	for (uint8_t i = 0; i < ENCODERS; ++i) {
-		if ((encoder_last_value[i] != encoder_value[i])) {
+    // query encoders and update / display info
+    for (uint8_t i = 0; i < ENCODERS; ++i) {
+        if (encoder_last_value[i] != encoder_value[i]) {
 #ifdef SERIAL
-			Serial1.print("Encoder ");
-			Serial1.print(i, DEC);
-			Serial1.print(" = ");
-			Serial1.print(encoder_value[i]);
-			Serial1.print(", loopc = ");
-			Serial1.println(loopc);
+            Serial1.print("Encoder ");
+            Serial1.print(i, DEC);
+            Serial1.print(" = ");
+            Serial1.print(encoder_value[i]);
+            Serial1.print(", loopc = ");
+            Serial1.println(loopc);
 #endif
-			encoder_last_value[i] = encoder_value[i];
-			pwmWrite(pwm_pins[i], map(encoder_value[i], encoder_min[i], encoder_max[i], 0, pwm_max_duty_cycle[i]));
-			oled_update = true;
-    	}
-  	}
-	if (oled_update) {
-		oled.clearDisplay();
-		for (uint8_t i = 0; i < ENCODERS; ++i) {
-			#define ENCODER_GRAPH_SEP 16
-			oled.setCursor(i * ENCODER_GRAPH_SEP, 0);
-			oled.print(i + 1, DEC);
-			oled.setCursor(i * ENCODER_GRAPH_SEP, 9);
-			oled.println(encoder_value[i], DEC);
-			#define ENCODER_GRAPH_MAX 48
-			gfx_bar_graph(i * ENCODER_GRAPH_SEP, 64, 10, ENCODER_GRAPH_MAX, map(encoder_value[i], encoder_min[i], encoder_max[i], 0, ENCODER_GRAPH_MAX));
-		}
-		oled.display();
-	}
+            encoder_last_value[i] = encoder_value[i];
+            pwmWrite(pwm_pins[i], map(encoder_value[i], \
+                                        encoder_min[i], encoder_max[i], \
+                                        0, pwm_max_duty_cycle[i]));
+            oled_update = true;
+        }
+    }
+    if (oled_update) {
+        oled.clearDisplay();
+        for (uint8_t i = 0; i < ENCODERS; ++i) {
+            #define ENCODER_GRAPH_SEP 16
+            oled.setCursor(i * ENCODER_GRAPH_SEP, 0);
+            oled.print(i + 1, DEC);
+            oled.setCursor(i * ENCODER_GRAPH_SEP, 9);
+            oled.println(encoder_value[i], DEC);
+            #define ENCODER_GRAPH_MAX 48
+            gfx_bar_graph(i * ENCODER_GRAPH_SEP, \
+                            64, 10, ENCODER_GRAPH_MAX, \
+                            map(encoder_value[i], \
+                                encoder_min[i], encoder_max[i], \
+                                0, ENCODER_GRAPH_MAX));
+        }
+        oled.display();
+    }
 }
 
 
@@ -185,44 +192,44 @@ void loop() {
  * Encoder interupt and data structure initialization
  *****************************************************************************/
 int i2c_scan(void) {
-	uint8_t error, addr;
-	int n_devices = 0;
+    uint8_t error, addr;
+    int n_devices = 0;
 
 #ifdef SERIAL
-	Serial1.println("starting i2c bus scan...");
+    Serial1.println("starting i2c bus scan...");
 #endif
 
-	for (addr = 1; addr < 127; ++addr) {
-		HWire.beginTransmission(addr);
-		error = HWire.endTransmission();
+    for (addr = 1; addr < 127; ++addr) {
+        HWire.beginTransmission(addr);
+        error = HWire.endTransmission();
 
-		if (error == 0) {
+        if (error == 0) {
 #ifdef SERIAL
-			Serial1.print("i2c device found @ 0x");
-			if (addr < 16)
-				Serial1.print("0");
-			Serial1.println(addr, HEX);
+            Serial1.print("i2c device found @ 0x");
+            if (addr < 16)
+                Serial1.print("0");
+            Serial1.println(addr, HEX);
 #endif
-			++n_devices;
-		} else if (error == 4) {
+            ++n_devices;
+        } else if (error == 4) {
 #ifdef SERIAL
-			Serial1.print("unknown error @ 0x");
-			if (addr < 16)
-				Serial1.print("0");
-			Serial1.println(addr, HEX);
+            Serial1.print("unknown error @ 0x");
+            if (addr < 16)
+                Serial1.print("0");
+            Serial1.println(addr, HEX);
 #endif
-		}
-	}
+        }
+    }
 #ifdef SERIAL
-	if (n_devices == 0)
-		Serial1.println("no i2c devices found");
-	else {
-		Serial1.print("found ");
-		Serial1.print(n_devices, DEC);
-		Serial1.println(" i2c devices");
-	}
+    if (n_devices == 0)
+        Serial1.println("no i2c devices found");
+    else {
+        Serial1.print("found ");
+        Serial1.print(n_devices, DEC);
+        Serial1.println(" i2c devices");
+    }
 #endif
-	return n_devices;
+    return n_devices;
 }
 
 
@@ -230,59 +237,59 @@ int i2c_scan(void) {
  * Encoder interupt and data structure initialization
  *****************************************************************************/
 void encoders_read() {
-	for (uint8_t i = 0; i < ENCODERS; ++i) {
-		// gpio_read_bit is faster than digitalRead http://forums.leaflabs.com/topic.php?id=1107 
-		if ((gpio_read_bit(PIN_MAP[encoder_clk_pin[i]].gpio_device, PIN_MAP[encoder_clk_pin[i]].gpio_bit) ? HIGH : LOW) != encoder_clk[i]) {
-		//if ((digitalRead(encoder_clk_pin[i]) ? HIGH : LOW) != encoder_clk[i]) {
-			encoder_clk[i] = !encoder_clk[i];
-			if (encoder_clk[i] && !encoder_dt[i]) {
-				if (millis() - encoder_millis[i] > ENCODER_SLOW_MS)
-					encoder_value[i] += 1;
-				else
-					encoder_value[i] += ENCODER_FAST_STEPS;
-				if (encoder_value[i] < encoder_min[i])
-					encoder_value[i] = encoder_min[i];
-				else if (encoder_value[i] > encoder_max[i])
-					encoder_value[i] = encoder_max[i];
-			}
-			encoder_millis[i] = millis();
-		}
-		if ((gpio_read_bit(PIN_MAP[encoder_dt_pin[i]].gpio_device, PIN_MAP[encoder_dt_pin[i]].gpio_bit) ? HIGH : LOW) != encoder_dt[i]) {
-		//if ((digitalRead(encoder_dt_pin[i]) ? HIGH : LOW) != encoder_dt[i]) {
-			encoder_dt[i] = !encoder_dt[i];
-			if (encoder_dt[i] && !encoder_clk[i]) {
-				if (millis() - encoder_millis[i] > ENCODER_SLOW_MS)
-					encoder_value[i] -= 1;
-        		else
-          			encoder_value[i] -= ENCODER_FAST_STEPS;
-				if (encoder_value[i] < encoder_min[i])
-					encoder_value[i] = encoder_min[i];
-				else if (encoder_value[i] > encoder_max[i])
-					encoder_value[i] = encoder_max[i];
-			}
-      		encoder_millis[i] = millis();
-    	}
-	}
+    for (uint8_t i = 0; i < ENCODERS; ++i) {
+        // gpio_read_bit is faster than digitalRead http://forums.leaflabs.com/topic.php?id=1107 
+        if ((gpio_read_bit(PIN_MAP[encoder_clk_pin[i]].gpio_device, PIN_MAP[encoder_clk_pin[i]].gpio_bit) ? HIGH : LOW) != encoder_clk[i]) {
+        //if ((digitalRead(encoder_clk_pin[i]) ? HIGH : LOW) != encoder_clk[i]) {
+            encoder_clk[i] = !encoder_clk[i];
+            if (encoder_clk[i] && !encoder_dt[i]) {
+                if (millis() - encoder_millis[i] > ENCODER_SLOW_MS)
+                    encoder_value[i] += 1;
+                else
+                    encoder_value[i] += ENCODER_FAST_STEPS;
+                if (encoder_value[i] < encoder_min[i])
+                    encoder_value[i] = encoder_min[i];
+                else if (encoder_value[i] > encoder_max[i])
+                    encoder_value[i] = encoder_max[i];
+            }
+            encoder_millis[i] = millis();
+        }
+        if ((gpio_read_bit(PIN_MAP[encoder_dt_pin[i]].gpio_device, PIN_MAP[encoder_dt_pin[i]].gpio_bit) ? HIGH : LOW) != encoder_dt[i]) {
+        //if ((digitalRead(encoder_dt_pin[i]) ? HIGH : LOW) != encoder_dt[i]) {
+            encoder_dt[i] = !encoder_dt[i];
+            if (encoder_dt[i] && !encoder_clk[i]) {
+                if (millis() - encoder_millis[i] > ENCODER_SLOW_MS)
+                    encoder_value[i] -= 1;
+                else
+                      encoder_value[i] -= ENCODER_FAST_STEPS;
+                if (encoder_value[i] < encoder_min[i])
+                    encoder_value[i] = encoder_min[i];
+                else if (encoder_value[i] > encoder_max[i])
+                    encoder_value[i] = encoder_max[i];
+            }
+              encoder_millis[i] = millis();
+        }
+    }
 }
 
 void encoders_init() {
-	for (uint8_t i = 0; i < ENCODERS; ++i) {
-		encoder_clk[i] = true;
-		encoder_dt[i] = true;
-		encoder_value[i] = 0;
-		encoder_last_value[i] = 1;
-		pinMode(encoder_clk_pin[i], INPUT);
-		pinMode(encoder_dt_pin[i], INPUT);
-		encoder_millis[i] = millis();
-	}
+    for (uint8_t i = 0; i < ENCODERS; ++i) {
+        encoder_clk[i] = true;
+        encoder_dt[i] = true;
+        encoder_value[i] = 0;
+        encoder_last_value[i] = 1;
+        pinMode(encoder_clk_pin[i], INPUT);
+        pinMode(encoder_dt_pin[i], INPUT);
+        encoder_millis[i] = millis();
+    }
 
-	encoder_timer.pause();
-	encoder_timer.setPeriod(ENCODER_PERIOD_uS);
-	encoder_timer.setChannel1Mode(TIMER_OUTPUT_COMPARE);
-	encoder_timer.setCompare(TIMER_CH1, 1);
-	encoder_timer.attachCompare1Interrupt(encoders_read);
-	encoder_timer.refresh();
-	encoder_timer.resume();
+    encoder_timer.pause();
+    encoder_timer.setPeriod(ENCODER_PERIOD_uS);
+    encoder_timer.setChannel1Mode(TIMER_OUTPUT_COMPARE);
+    encoder_timer.setCompare(TIMER_CH1, 1);
+    encoder_timer.attachCompare1Interrupt(encoders_read);
+    encoder_timer.refresh();
+    encoder_timer.resume();
 }
 
 
@@ -290,14 +297,14 @@ void encoders_init() {
  * Graphics visuals
  *****************************************************************************/
 void gfx_bar_graph(uint8_t base_x, uint8_t base_y, uint8_t width, 
-					uint8_t height, uint8_t value) {
-	uint8_t x0, y0, fill_height;
-	if (value > height)
-		value = height;
-	x0 = base_x;
-	y0 = base_y - height;
-	fill_height = value;
-	oled.fillRect(x0, y0, width, fill_height, 1);
+                    uint8_t height, uint8_t value) {
+    uint8_t x0, y0, fill_height;
+    if (value > height)
+        value = height;
+    x0 = base_x;
+    y0 = base_y - height;
+    fill_height = value;
+    oled.fillRect(x0, y0, width, fill_height, 1);
 }
 
 
@@ -305,13 +312,13 @@ void gfx_bar_graph(uint8_t base_x, uint8_t base_y, uint8_t width,
  * PWM
  *****************************************************************************/
 void pwm_init() {
-	for (uint8_t i = 0; i < PWMS; ++i) {
-		pwm_timer.pause();
-		pwm_max_duty_cycle[i] = pwm_timer.setPeriod(pwm_period_uS[i]);
-		pwm_timer.refresh();
-		pwm_timer.resume();
+    for (uint8_t i = 0; i < PWMS; ++i) {
+        pwm_timer.pause();
+        pwm_max_duty_cycle[i] = pwm_timer.setPeriod(pwm_period_uS[i]);
+        pwm_timer.refresh();
+        pwm_timer.resume();
 
-		pinMode(pwm_pins[i], PWM);
-		pwmWrite(pwm_pins[i], 0);
-	}
+        pinMode(pwm_pins[i], PWM);
+        pwmWrite(pwm_pins[i], 0);
+    }
 }
