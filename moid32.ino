@@ -57,6 +57,7 @@ volatile int encoder_sw_millis[ENCODERS];
 int encoder_clk_pin[ENCODERS] = { PB4, PB6 };
 int encoder_dt_pin[ENCODERS] = { PB5, PB7 };
 int encoder_sw_pin[ENCODERS] = { PA15 , PB3 };
+//int encoder_sw_pin[ENCODERS] = { PB6, PB7 };
 int encoder_min[ENCODERS] = { 0, 0 };
 int encoder_max[ENCODERS] = { 20, 20 };
 unsigned int encoder_last_value[ENCODERS];
@@ -169,23 +170,41 @@ void loop() {
             }
             oled_update = true;
         }
-        if (encoder_sw[i] == true) {
-            switch(i) {
-                case 0:
-                    // control encoder handling
-                    break;
-                case 1:
-                    // channel 1 handling
-                    nvic_sys_reset();
-                    break;
-                case 2:
-                    // channel 2 handling
-                    nvic_sys_reset();
-                    break;
-                default:
-                    break;
-            };
-            encoder_sw[i] = false;
+        if (encoder_last_sw[i] != encoder_sw[i]) {
+			if (encoder_sw[i]) {
+				// sw is pressed
+            	switch(i) {
+                	case 0:
+                    	// control encoder handling
+                    	break;
+                	case 1:
+                    	// channel 1 handling
+                    	nvic_sys_reset();
+                    	break;
+                	case 2:
+                    	// channel 2 handling
+                    	nvic_sys_reset();
+                    	break;
+                	default:
+                    	break;
+            	};
+			} else {
+				// sw is released
+            	switch(i) {
+                	case 0:
+                    	// control encoder handling
+                    	break;
+                	case 1:
+                    	// channel 1 handling
+                    	break;
+                	case 2:
+                    	// channel 2 handling
+                    	break;
+                	default:
+                    	break;
+            	};
+			}
+            encoder_last_sw[i] = encoder_sw[i];
         }
     }
     if (oled_update) {
@@ -290,10 +309,14 @@ void encoders_read() {
               encoder_millis[i] = millis();
         }
 #if 1
-        if ((gpio_read_bit(PIN_MAP[encoder_sw_pin[i]].gpio_device, PIN_MAP[encoder_sw_pin[i]].gpio_bit) ? HIGH : LOW) != encoder_sw[i]) {
-        //if ((digitalRead(encoder_sw_pin[i]) ? HIGH : LOW) != encoder_sw[i]) {
-            encoder_sw[i] = !encoder_sw[i];
-			encoder_sw_millis[i] = millis();
+        if (gpio_read_bit(PIN_MAP[encoder_sw_pin[i]].gpio_device, PIN_MAP[encoder_sw_pin[i]].gpio_bit) == LOW) {
+        //if ((gpio_read_bit(PIN_MAP[encoder_sw_pin[i]].gpio_device, PIN_MAP[encoder_sw_pin[i]].gpio_bit) ? HIGH : LOW) != encoder_sw[i]) {
+        if ((digitalRead(encoder_sw_pin[i]) ? HIGH : LOW) != encoder_sw[i]) {
+        if (digitalRead(encoder_sw_pin[i]) == LOW) {
+			if (millis() - encoder_sw_millis[i] > 3) {
+				encoder_sw[i] == true;
+				encoder_sw_millis[i] = millis();
+			}
         }
 #endif
     }
@@ -305,9 +328,10 @@ void encoders_init() {
     for (uint8_t i = 0; i < ENCODERS; ++i) {
         encoder_clk[i] = true;
         encoder_dt[i] = true;
-        encoder_sw[i] = true;
+        encoder_sw[i] = false;
         encoder_value[i] = 0;
         encoder_last_value[i] = 1;
+        encoder_last_sw[i] = encoder_sw[i];
         pinMode(encoder_clk_pin[i], INPUT);
         pinMode(encoder_dt_pin[i], INPUT);
         pinMode(encoder_sw_pin[i], INPUT);
