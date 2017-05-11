@@ -51,12 +51,13 @@ Adafruit_SSD1306 oled(OLED_RESET);
 boolean encoder_clk[ENCODERS];
 boolean encoder_dt[ENCODERS];
 boolean encoder_sw[ENCODERS];
+boolean encoder_sw_debounce[ENCODERS];
 volatile int16_t encoder_value[ENCODERS];
 volatile int encoder_millis[ENCODERS]; 
 volatile int encoder_sw_millis[ENCODERS]; 
 int encoder_clk_pin[ENCODERS] = { PB4, PB6 };
 int encoder_dt_pin[ENCODERS] = { PB5, PB7 };
-int encoder_sw_pin[ENCODERS] = { PA15 , PB3 };
+int encoder_sw_pin[ENCODERS] = { PA15 , PA12 };
 //int encoder_sw_pin[ENCODERS] = { PB6, PB7 };
 int encoder_min[ENCODERS] = { 0, 0 };
 int encoder_max[ENCODERS] = { 20, 20 };
@@ -171,19 +172,19 @@ void loop() {
             oled_update = true;
         }
         if (encoder_last_sw[i] != encoder_sw[i]) {
-			if (encoder_sw[i]) {
+			if (!encoder_sw[i]) {
 				// sw is pressed
             	switch(i) {
                 	case 0:
-                    	// control encoder handling
-                    	break;
-                	case 1:
                     	// channel 1 handling
                     	nvic_sys_reset();
                     	break;
-                	case 2:
+                	case 1:
                     	// channel 2 handling
                     	nvic_sys_reset();
+                    	break;
+                	case 2:
+                    	// control encoder handling
                     	break;
                 	default:
                     	break;
@@ -192,19 +193,20 @@ void loop() {
 				// sw is released
             	switch(i) {
                 	case 0:
-                    	// control encoder handling
-                    	break;
-                	case 1:
                     	// channel 1 handling
                     	break;
-                	case 2:
+                	case 1:
                     	// channel 2 handling
+                    	break;
+                	case 2:
+                    	// control encoder handling
                     	break;
                 	default:
                     	break;
             	};
 			}
             encoder_last_sw[i] = encoder_sw[i];
+			oled_update = true;
         }
     }
     if (oled_update) {
@@ -221,6 +223,10 @@ void loop() {
                             map(encoder_value[i], \
                                 encoder_min[i], encoder_max[i], \
                                 0, ENCODER_GRAPH_MAX));
+// TEST
+			oled.setCursor(30 + i * ENCODER_GRAPH_SEP, 0);
+			oled.print(encoder_sw[i], DEC);
+// TEST
         }
         oled.display();
     }
@@ -311,13 +317,18 @@ void encoders_read() {
 #if 1
         if (gpio_read_bit(PIN_MAP[encoder_sw_pin[i]].gpio_device, PIN_MAP[encoder_sw_pin[i]].gpio_bit) == LOW) {
         //if ((gpio_read_bit(PIN_MAP[encoder_sw_pin[i]].gpio_device, PIN_MAP[encoder_sw_pin[i]].gpio_bit) ? HIGH : LOW) != encoder_sw[i]) {
-        if ((digitalRead(encoder_sw_pin[i]) ? HIGH : LOW) != encoder_sw[i]) {
-        if (digitalRead(encoder_sw_pin[i]) == LOW) {
-			if (millis() - encoder_sw_millis[i] > 3) {
-				encoder_sw[i] == true;
+        //if ((digitalRead(encoder_sw_pin[i]) ? HIGH : LOW) != encoder_sw[i]) {
+        //if (digitalRead(encoder_sw_pin[i]) == LOW) {
+			if (encoder_sw_debounce[i] == false) {
 				encoder_sw_millis[i] = millis();
+				encoder_sw_debounce[i] = true;
+			} else if (millis() - encoder_sw_millis[i] > ENCODER_SLOW_MS) {
+				encoder_sw[i] = true;
 			}
-        }
+        } else if (encoder_sw_debounce[i] == true) {
+			encoder_sw_debounce[i] = false;
+			encoder_sw[i] = false;
+		}
 #endif
     }
 }
@@ -329,6 +340,7 @@ void encoders_init() {
         encoder_clk[i] = true;
         encoder_dt[i] = true;
         encoder_sw[i] = false;
+        encoder_sw_debounce[i] = false;
         encoder_value[i] = 0;
         encoder_last_value[i] = 1;
         encoder_last_sw[i] = encoder_sw[i];
