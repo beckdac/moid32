@@ -44,7 +44,7 @@ Adafruit_SSD1306 oled(OLED_RESET);
 /******************************************************************************
  * Rotary encoders
  *****************************************************************************/
-#define ENCODERS 2
+#define ENCODERS 3
 #define ENCODER_PERIOD_uS    1000
 #define ENCODER_SLOW_MS    3
 #define ENCODER_FAST_STEPS    5
@@ -55,12 +55,11 @@ boolean encoder_sw_debounce[ENCODERS];
 volatile int16_t encoder_value[ENCODERS];
 volatile int encoder_millis[ENCODERS]; 
 volatile int encoder_sw_millis[ENCODERS]; 
-int encoder_clk_pin[ENCODERS] = { PB4, PB6 };
-int encoder_dt_pin[ENCODERS] = { PB5, PB7 };
-int encoder_sw_pin[ENCODERS] = { PA15 , PA12 };
-//int encoder_sw_pin[ENCODERS] = { PB6, PB7 };
-int encoder_min[ENCODERS] = { 0, 0 };
-int encoder_max[ENCODERS] = { 20, 20 };
+int encoder_clk_pin[ENCODERS] = { PB4, PB6, PB14 };
+int encoder_dt_pin[ENCODERS] = { PB5, PB7, PB13 };
+int encoder_sw_pin[ENCODERS] = { PA15 , PA12, PB12 };
+int encoder_min[ENCODERS] = { 0, 0, 0 };
+int encoder_max[ENCODERS] = { 20, 20, 20 };
 unsigned int encoder_last_value[ENCODERS];
 boolean encoder_last_sw[ENCODERS];
 HardwareTimer encoder_timer(1);
@@ -69,12 +68,12 @@ HardwareTimer encoder_timer(1);
 /******************************************************************************
  * PWM
  *****************************************************************************/
-#define PWMS    2
+#define PWMS    3
 #define PWM_PERIOD_uS_DEFAULT    50
 uint16_t pwm_period_uS[PWMS] = { PWM_PERIOD_uS_DEFAULT, PWM_PERIOD_uS_DEFAULT };
-uint16_t pwm_max_duty_cycle[PWMS] = { 0, 0 };
-uint16_t pwm_duty_cycle[PWMS] = { 0, 0 };
-uint16_t pwm_pins[PWMS] = { PA0, PA1 };
+uint16_t pwm_max_duty_cycle[PWMS] = { 0, 0, 0 };
+uint16_t pwm_duty_cycle[PWMS] = { 0, 0, 0 };
+uint16_t pwm_pins[PWMS] = { PA0, PA1, 0 };
 HardwareTimer pwm_timer(2);
 
 
@@ -224,7 +223,7 @@ void loop() {
                                 encoder_min[i], encoder_max[i], \
                                 0, ENCODER_GRAPH_MAX));
 // TEST
-			oled.setCursor(30 + i * ENCODER_GRAPH_SEP, 0);
+			oled.setCursor(50 + i * ENCODER_GRAPH_SEP, 0);
 			oled.print(encoder_sw[i], DEC);
 // TEST
         }
